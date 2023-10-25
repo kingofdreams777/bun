@@ -799,6 +799,40 @@ end:
   return ret;
 }
 
+int add_ca_cert_to_ctx_store(SSL_CTX *ctx, const char *content, X509_STORE *store) {
+
+    X509 *x = NULL;
+    BIO *in;
+
+    ERR_clear_error();  // clear error stack for SSL_CTX_use_certificate()
+
+    in = BIO_new_mem_buf(content, strlen(content));
+    if (in == NULL) {
+        OPENSSL_PUT_ERROR(SSL, ERR_R_BUF_LIB);
+        goto end;
+    }
+
+    int count = 0;
+
+    while(x = PEM_read_bio_X509(in, NULL, SSL_CTX_get_default_passwd_cb(ctx),
+                                SSL_CTX_get_default_passwd_cb_userdata(ctx))) {
+
+        X509_STORE_add_cert(store, x);
+
+        if(!SSL_CTX_add_client_CA(ctx, x)){  
+            X509_free(x);
+            return 0;
+        }
+        count++;
+        X509_free(x);
+    }
+
+end:
+    BIO_free(in);
+    
+    return count > 0;
+}
+
 X509 * us_ssl_ctx_get_X509_from(SSL_CTX *ctx, const char *content) {
   X509 *x = NULL;
   BIO *in;
@@ -1075,22 +1109,16 @@ SSL_CTX *create_ssl_context_from_bun_options(struct us_bun_socket_context_option
         X509_STORE* cert_store = NULL;
         
         for(unsigned int i = 0; i < options.ca_count; i++){
-            X509* ca_cert = us_ssl_ctx_get_X509_from(ssl_context, options.ca[i]);
-            if (ca_cert == NULL){
-                free_ssl_context(ssl_context);
-                return NULL;
-            }
-
             if (cert_store == NULL) {
                 cert_store = us_get_default_ca_store();
                 SSL_CTX_set_cert_store(ssl_context, cert_store);
             }
     
-            X509_STORE_add_cert(cert_store, ca_cert);
-            if(!SSL_CTX_add_client_CA(ssl_context, ca_cert)){
+            if (!add_ca_cert_to_ctx_store(ssl_context, options.ca[i], cert_store)){
                 free_ssl_context(ssl_context);
                 return NULL;
             }
+
             if(options.reject_unauthorized) {
                 SSL_CTX_set_verify(ssl_context, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, us_verify_callback);
             } else {
