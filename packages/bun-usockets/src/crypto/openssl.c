@@ -231,7 +231,6 @@ void us_internal_ssl_handshake(struct us_internal_ssl_socket_t *s, void (*on_han
 
     
     int result = SSL_do_handshake(s->ssl);
-
     if (result <= 0) {
         int err = SSL_get_error(s->ssl, result);
         // as far as I know these are the only errors we want to handle
@@ -250,6 +249,7 @@ void us_internal_ssl_handshake(struct us_internal_ssl_socket_t *s, void (*on_han
             }
             return;
         } else {
+
             s->pending_handshake = 1;
             context->on_handshake = on_handshake;
             context->handshake_data = custom_data;
@@ -280,6 +280,10 @@ struct us_internal_ssl_socket_t *us_internal_ssl_socket_close(struct us_internal
     struct us_internal_ssl_socket_context_t *context = (struct us_internal_ssl_socket_context_t *) us_socket_context(0, &s->s);
     if (s->pending_handshake) {
         s->pending_handshake = 0;
+        if(context->on_handshake != NULL) {
+            struct us_bun_verify_error_t verify_error = us_internal_verify_error(s);
+            context->on_handshake(s, 0, verify_error, context->handshake_data);
+        }
     }
     return (struct us_internal_ssl_socket_t *) us_socket_close(0, (struct us_socket_t *) s, code, reason);
 }
