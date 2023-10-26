@@ -824,6 +824,7 @@ int add_ca_cert_to_ctx_store(SSL_CTX *ctx, const char *content, X509_STORE *stor
 
         if(!SSL_CTX_add_client_CA(ctx, x)){  
             X509_free(x);
+            BIO_free(in);
             return 0;
         }
         count++;
