@@ -837,33 +837,6 @@ end:
     return count > 0;
 }
 
-X509 * us_ssl_ctx_get_X509_from(SSL_CTX *ctx, const char *content) {
-  X509 *x = NULL;
-  BIO *in;
-
-  ERR_clear_error();  // clear error stack for SSL_CTX_use_certificate()
-
-  in = BIO_new_mem_buf(content, strlen(content));
-  if (in == NULL) {
-    OPENSSL_PUT_ERROR(SSL, ERR_R_BUF_LIB);
-    goto end;
-  }
-
-  x = PEM_read_bio_X509(in, NULL, SSL_CTX_get_default_passwd_cb(ctx),
-                            SSL_CTX_get_default_passwd_cb_userdata(ctx));
-  if (x == NULL) {
-    OPENSSL_PUT_ERROR(SSL, ERR_R_PEM_LIB);
-    goto end;
-  }
-
-  return x;
-
-end:
-  X509_free(x);
-  BIO_free(in);
-  return NULL;
-}
-
 int us_ssl_ctx_use_certificate_chain(SSL_CTX *ctx, const char *content) {
   BIO *in;
   int ret = 0;
