@@ -190,7 +190,7 @@ struct us_internal_ssl_socket_t *ssl_on_open(struct us_internal_ssl_socket_t *s,
     // always handshake after open if on_handshake is set
     if(context->on_handshake || s->pending_handshake) {
         s->pending_handshake = 1;
-        us_internal_ssl_handshake(s, context->on_handshake, context->handshake_data);
+        us_internal_ssl_handshake(s);
     }
     
     return result;
@@ -202,15 +202,14 @@ void us_internal_on_ssl_handshake(struct us_internal_ssl_socket_context_t * cont
     context->handshake_data = custom_data;
 }
 
-void us_internal_ssl_handshake(struct us_internal_ssl_socket_t *s, void (*on_handshake)(struct us_internal_ssl_socket_t *, int success, struct us_bun_verify_error_t verify_error, void* custom_data), void* custom_data) {
+void us_internal_ssl_handshake(struct us_internal_ssl_socket_t *s) {
     struct us_internal_ssl_socket_context_t *context = (struct us_internal_ssl_socket_context_t *) us_socket_context(0, &s->s);
-    
+    void (*on_handshake)(struct us_internal_ssl_socket_t *, int, struct us_bun_verify_error_t, void*) = context->on_handshake;
+    void* custom_data = context->handshake_data;
+
     // will start on_open, on_writable or on_data
     if(!s->ssl) {
-        
         s->pending_handshake = 1;
-        context->on_handshake = on_handshake;
-        context->handshake_data = custom_data;
         return;
     }
 
@@ -319,7 +318,7 @@ struct us_internal_ssl_socket_t *ssl_on_data(struct us_internal_ssl_socket_t *s,
     struct loop_ssl_data *loop_ssl_data = (struct loop_ssl_data *) loop->data.ssl_data;
 
     if(s->pending_handshake) {
-        us_internal_ssl_handshake(s, context->on_handshake, context->handshake_data);
+        us_internal_ssl_handshake(s);
     }
 
   // note: if we put data here we should never really clear it (not in write either, it still should be available for SSL_write to read from!)
@@ -474,7 +473,7 @@ struct us_internal_ssl_socket_t *ssl_on_writable(struct us_internal_ssl_socket_t
     struct us_internal_ssl_socket_context_t *context = (struct us_internal_ssl_socket_context_t *) us_socket_context(0, &s->s);
 
     if(s->pending_handshake) {
-        us_internal_ssl_handshake(s, context->on_handshake, context->handshake_data);
+        us_internal_ssl_handshake(s);
     }
 
     // todo: cork here so that we efficiently output both from reading and from writing?
